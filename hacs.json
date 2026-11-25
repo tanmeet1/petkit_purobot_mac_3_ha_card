@@ -1,5 +1,6 @@
 {
   "name": "Purobot Max 3 Card",
   "filename": "purobot-max-3-card.js",
-  "render_readme": true
+  "render_readme": true,
+  "hide_default_branch": false
 }

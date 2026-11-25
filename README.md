@@ -24,10 +24,13 @@ Configure with a single Petkit `device_id`. Entities are matched by Petkit `tran
 
 ### HACS (recommended)
 
-1. HACS → Frontend → ⋮ → Custom repositories
-2. Add this repository URL, category **Dashboard**
-3. Install **Purobot Max 3 Card**
-4. Restart Home Assistant / refresh the browser cache if needed
+1. HACS → **Frontend** (Dashboard) → ⋮ → **Custom repositories**
+2. Repository: your GitHub URL (e.g. `https://github.com/tanmeet1/petkit_purobot_mac_3_ha_card`)
+3. Category: **Dashboard** (not Integration)
+4. Install **Purobot Max 3 Card**
+5. Hard-refresh the browser
+
+HACS requires the built file at `dist/purobot-max-3-card.js` on the default branch (and/or attached to a GitHub Release).
 
 ### Manual
 
