@@ -22,20 +22,22 @@ function normalizeName(value: string): string {
     .trim();
 }
 
+type MatchStrength = 3 | 2 | 1;
+
 function roleFromRegistry(
   entry: EntityRegistryEntry,
   state: HassEntity | undefined,
   deviceName: string | null,
-): EntityRole | undefined {
+): { role: EntityRole; strength: MatchStrength } | undefined {
   const key = entry.translation_key?.toLowerCase();
   if (key && TRANSLATION_KEY_TO_ROLE[key]) {
-    return TRANSLATION_KEY_TO_ROLE[key];
+    return { role: TRANSLATION_KEY_TO_ROLE[key], strength: 3 };
   }
 
   if (entry.unique_id) {
     for (const [pattern, role] of UNIQUE_ID_SUFFIX_TO_ROLE) {
       if (pattern.test(entry.unique_id)) {
-        return role;
+        return { role, strength: 2 };
       }
     }
   }
@@ -51,21 +53,31 @@ function roleFromRegistry(
   }
 
   if (FRIENDLY_NAME_TO_ROLE[cleaned]) {
-    return FRIENDLY_NAME_TO_ROLE[cleaned];
+    return { role: FRIENDLY_NAME_TO_ROLE[cleaned], strength: 1 };
   }
 
   // Handle Pause / Resume variants that share translation keys in some builds
   if (cleaned.startsWith("pause ")) {
-    if (cleaned.includes("dump")) return "pause_dumping";
-    if (cleaned.includes("maintenance")) return "pause_exit_maintenance";
-    if (cleaned.includes("clean")) return "pause_cleaning";
+    if (cleaned.includes("dump")) return { role: "pause_dumping", strength: 1 };
+    if (cleaned.includes("maintenance"))
+      return { role: "pause_exit_maintenance", strength: 1 };
+    if (cleaned.includes("clean")) return { role: "pause_cleaning", strength: 1 };
   }
   if (cleaned.startsWith("resume ")) {
-    if (cleaned.includes("dump")) return "resume_dumping";
-    if (cleaned.includes("maintenance")) return "resume_exit_maintenance";
+    if (cleaned.includes("dump")) return { role: "resume_dumping", strength: 1 };
+    if (cleaned.includes("maintenance"))
+      return { role: "resume_exit_maintenance", strength: 1 };
   }
 
   return undefined;
+}
+
+function domainScore(entityId: string, role: EntityRole): number {
+  const domain = entityId.split(".", 1)[0];
+  if (role === "litter_level" && domain === "sensor") return 2;
+  if (role === "wastebin" && domain === "binary_sensor") return 2;
+  if (role === "litter" && domain === "binary_sensor") return 2;
+  return 1;
 }
 
 export function getDevice(
@@ -94,6 +106,7 @@ export function resolveRoles(
   const device = getDevice(hass, deviceId);
   const deviceName = getDeviceDisplayName(device);
   const roles: RoleMap = {};
+  const strengths: Partial<Record<EntityRole, number>> = {};
 
   const entries = Object.values(hass.entities || {}).filter(
     (e) => e.device_id === deviceId && !e.disabled_by,
@@ -101,15 +114,44 @@ export function resolveRoles(
 
   for (const entry of entries) {
     const state = hass.states[entry.entity_id];
-    const role = roleFromRegistry(entry, state, deviceName);
-    if (!role) continue;
-    // Prefer first match; don't overwrite unless existing entity is missing state
-    if (!roles[role] || !hass.states[roles[role]!]) {
+    const match = roleFromRegistry(entry, state, deviceName);
+    if (!match) continue;
+
+    const { role, strength } = match;
+    const score = strength * 10 + domainScore(entry.entity_id, role);
+    const existing = strengths[role] ?? -1;
+    const existingState = roles[role] ? hass.states[roles[role]!] : undefined;
+
+    if (!roles[role] || !existingState || score > existing) {
       roles[role] = entry.entity_id;
+      strengths[role] = score;
     }
   }
 
   return roles;
+}
+
+/** Percent for gauges: supports %, 0–1 fractions, and 0–100 numbers. */
+export function gaugePercent(state: HassEntity | undefined): number | null {
+  if (!state || isUnavailable(state)) return null;
+  const n = Number.parseFloat(state.state);
+  if (!Number.isFinite(n)) return null;
+
+  const unit = String(state.attributes.unit_of_measurement || "")
+    .trim()
+    .toLowerCase();
+
+  if (unit === "%" || unit.includes("percent")) {
+    return Math.max(0, Math.min(100, n));
+  }
+  // Some Petkit payloads briefly expose 0–1 fractions
+  if (n > 0 && n <= 1) {
+    return Math.round(n * 1000) / 10;
+  }
+  if (n >= 0 && n <= 100) {
+    return n;
+  }
+  return null;
 }
 
 export function getState(

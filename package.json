@@ -1,6 +1,6 @@
 {
   "name": "purobot-max-3-card",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "Home Assistant Lovelace card for the Petkit Purobot Max 3 (Jezza34000/homeassistant_petkit)",
   "type": "module",
   "scripts": {

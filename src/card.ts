@@ -3,6 +3,7 @@ import { customElement, property, state } from "lit/decorators.js";
 import { ROLE_ICONS, ROLE_LABELS } from "./entity-map";
 import {
   formatState,
+  gaugePercent,
   getDevice,
   getDeviceDisplayName,
   getState,
@@ -144,14 +145,44 @@ export class PurobotMax3Card extends LitElement {
     invert = false,
   ): TemplateResult | typeof nothing {
     if (!state) return nothing;
-    const value = parseNumeric(state);
-    const pct = value === null ? 0 : Math.max(0, Math.min(100, value));
+
+    const domain = state.entity_id.split(".", 1)[0];
+
+    // Wastebin / litter-low are binary problem sensors, not fill %
+    if (domain === "binary_sensor") {
+      const problem = isOn(state);
+      const display = invert
+        ? problem
+          ? "Full"
+          : "OK"
+        : problem
+          ? "Low"
+          : "OK";
+      const tone = problem ? "danger" : "ok";
+      const pct = invert ? (problem ? 100 : 5) : problem ? 10 : 100;
+      return html`
+        <div class="gauge" title=${state.entity_id}>
+          <div class="gauge-label">
+            <span>${label}</span>
+            <span class="gauge-value">${display}</span>
+          </div>
+          <div class="bar ${tone === "ok" ? "" : tone}">
+            <span style="width: ${pct}%"></span>
+          </div>
+        </div>
+      `;
+    }
+
+    const value = gaugePercent(state);
+    const pct = value === null ? 0 : value;
     const tone = this._gaugeTone(value, invert);
     const display =
-      value === null ? formatState(this.hass, state) : `${Math.round(pct)}%`;
+      value === null
+        ? formatState(this.hass, state)
+        : `${Math.round(pct)}%`;
 
     return html`
-      <div class="gauge">
+      <div class="gauge" title=${state.entity_id}>
         <div class="gauge-label">
           <span>${label}</span>
           <span class="gauge-value">${display}</span>
@@ -389,6 +420,7 @@ export class PurobotMax3Card extends LitElement {
             )}
           </div>
           <div class="consumables">
+            ${this._renderStat(roles, "litter")}
             ${this._renderStat(roles, "n50")}
             ${this._renderStat(roles, "n60")}
             ${this._renderStat(roles, "litter_weight")}
