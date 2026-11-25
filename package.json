@@ -1,0 +1,26 @@
+{
+  "name": "purobot-max-3-card",
+  "version": "0.1.0",
+  "description": "Home Assistant Lovelace card for the Petkit Purobot Max 3 (Jezza34000/homeassistant_petkit)",
+  "type": "module",
+  "scripts": {
+    "dev": "vite build --watch",
+    "build": "vite build",
+    "preview": "vite preview"
+  },
+  "keywords": [
+    "home-assistant",
+    "lovelace",
+    "petkit",
+    "purobot",
+    "litter"
+  ],
+  "license": "MIT",
+  "dependencies": {
+    "lit": "^3.2.1"
+  },
+  "devDependencies": {
+    "typescript": "^5.7.3",
+    "vite": "^6.0.7"
+  }
+}
